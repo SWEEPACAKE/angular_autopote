@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ApiService } from '../../services/api-service';
-import { Part } from '../../interfaces/part.interface';
+import { Part, Brand } from '../../interfaces/part.interface';
 import { CurrencyPipe } from '@angular/common';
 @Component({
   selector: 'app-part-list',
@@ -11,22 +11,60 @@ import { CurrencyPipe } from '@angular/common';
 })
 export class PartListComponent implements OnInit {
 
+  // On prépare les tableaux qui vont recevoir les pièces ou les brands
+  parts = signal<Part[]>([]);
+  brands = signal<Brand[]>([]);
 
-  parts: Part[] = [];
+  // Les variables qui vont nous aider à paginer
+  totalItems: number = 0;
+  currentPage: number = 1;
+  itemsPerPage: number = 12;
+
+  // La variable qui va contenir la valeur du select 
+  selectedBrandId: number | null = null;
+  
+  // État du chargement
   isLoading = signal<boolean>(false);
 
   constructor(private partService: ApiService) {}
 
   ngOnInit(): void {
+    this.loadBrands();
     this.loadParts();
   }
 
-  loadParts(): void {
-    this.isLoading.set(true);
-    this.partService.getParts().subscribe({
+  /********************************************
+ * 
+ * 
+ *                API CALLS
+ * 
+ * 
+ *******************************************/
+
+  // Chargement des Brands
+  loadBrands(): void {
+    this.partService.getBrands().subscribe({
       next: (data) => {
-        this.parts = data.member;
+        this.brands.set(data.member)
+      },
+      error: (err) => console.error('Erreur chargement marques', err)
+    });
+  }
+
+  // Chargement des pièces
+  loadParts(): void {
+
+    // Construction de l'IRI de la Brand
+    const brandIri = this.selectedBrandId
+      ? `/api/brands/${this.selectedBrandId}`
+      : undefined;
+
+    this.isLoading.set(true);
+    this.partService.getParts(this.currentPage, brandIri).subscribe({
+      next: (data) => {
+        this.parts.set(data.member);
         this.isLoading.set(false);
+        this.totalItems = data.totalItems;
       },
       error: (err) => {
         console.error('Erreur lors du chargement des pièces', err);
@@ -35,6 +73,54 @@ export class PartListComponent implements OnInit {
     });
   }
 
+
+  /********************************************
+   * 
+   * 
+   *                FILTRES
+   * 
+   * 
+   *******************************************/
+
+  // Méthode lancée dès que le select des Brand est modifié
+  onBrandChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.selectedBrandId = value ? Number(value) : null;
+    this.currentPage = 1; // Quand on change un filtre, on repasse en page 1 (c'est une règle générale)
+    this.loadParts();
+  }
+
+  /********************************************
+   * 
+   * 
+   *                PAGINATION
+   * 
+   * 
+   *******************************************/
+  
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.nbPages) return;
+    this.currentPage = page;
+    this.loadParts();
+  }
+
+  get nbPages(): number {
+    return Math.ceil(this.totalItems / this.itemsPerPage);
+  }
+
+  get lastItemIndex(): number {
+    return Math.min(this.currentPage * this.itemsPerPage, this.totalItems);
+  }
+
+
+  /********************************************
+   * 
+   * 
+   *       AFFICHAGE / GESTION DE CLASSE
+   * 
+   * 
+   *******************************************/
 
   getStockClass(part: Part): string {
     if (part.stock === 0) return 'danger';
@@ -47,4 +133,5 @@ export class PartListComponent implements OnInit {
     if (part.stock <= 3) return `Stock faible (${part.stock})`;
     return `En stock (${part.stock})`;
   }
+
 }
