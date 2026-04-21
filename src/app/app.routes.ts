@@ -9,9 +9,9 @@ import { authGuard } from './guards/auth-guard';
 export const routes: Routes = [
   { path: '', redirectTo: 'parts', pathMatch: 'full' },
   { path: 'parts', component: PartListComponent },
-  { path: 'categorie-form', component: CategorieForm },
-  { path: 'brand-form', component: BrandForm },
-  { path: 'part-form', component: PartForm },
+  { path: 'categorie-form', component: CategorieForm, canActivate: [authGuard] },
+  { path: 'brand-form', component: BrandForm, canActivate: [authGuard] },
+  { path: 'part-form', component: PartForm, canActivate: [authGuard] },
   { 
     path: 'dashboard', 
     component: Dashboard, 
